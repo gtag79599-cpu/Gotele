@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WOOD v74 ULTIMATUM</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root { --main: #0f0f13; --acc: #00e676; --gold: #ffd600; --bg: #1a1a20; --txt: #fff; --msg-in: #2a2a35; }
+        * { box-sizing: border-box; font-family: -apple-system, sans-serif; margin: 0; padding: 0; }
+        body { background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; color: var(--txt); }
+        
+        header { background: var(--main); padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; z-index: 100; }
+        #net-stat { width: 10px; height: 10px; border-radius: 50%; background: red; display: inline-block; margin-right: 5px; box-shadow: 0 0 8px red; }
+        
+        #main-list { flex: 1; overflow-y: auto; padding: 15px; }
+        .card { background: var(--main); padding: 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #333; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .card.online { border-left: 4px solid var(--acc); }
+
+        #side { position: fixed; left: -100%; top: 0; width: 85%; height: 100%; background: var(--main); z-index: 2000; transition: 0.3s; border-right: 1px solid #333; overflow-y: auto; }
+        .side-in { left: 0 !important; }
+        .opt { padding: 18px 20px; border-bottom: 1px solid #222; font-weight: 600; font-size: 15px; cursor: pointer; }
+
+        #chat-view { position: fixed; inset: 0; background: var(--bg); z-index: 1500; display: none; flex-direction: column; background-size: cover; background-position: center; }
+        #msg-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; }
+        .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; position: relative; word-wrap: break-word; font-size: 15px; }
+        .msg.out { align-self: flex-end; background: var(--acc); color: #000; border-bottom-right-radius: 4px; }
+        .msg.in { align-self: flex-start; background: var(--msg-in); border-bottom-left-radius: 4px; border: 1px solid #333; }
+        .msg-info { font-size: 10px; opacity: 0.7; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .stk-img { width: 120px; height: 120px; object-fit: contain; margin-top: 5px; }
+
+        .mod { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 3000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .mod-in { background: var(--main); width: 100%; max-width: 350px; padding: 20px; border-radius: 16px; border: 1px solid #333; }
+        
+        input { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid #444; background: #000; color: white; margin: 10px 0; }
+        button { width: 100%; padding: 14px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; margin-top: 5px; background: #333; color: white; }
+        button.primary { background: var(--acc); color: #000; }
+        
+        #stk-panel { display: none; background: var(--main); padding: 15px; border-top: 1px solid #333; height: 200px; overflow-y: auto; }
+        .stk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div onclick="side(1)" style="font-size:24px; padding-right:15px;">☰</div>
+    <b style="flex:1;"><span id="net-stat"></span> WOOD v74</b>
+    <div style="color:var(--gold); font-size:14px;">⭐ <span id="s-val">0</span></div>
+</header>
+
+<div id="main-list">
+    <div class="card" onclick="openChat('GLOBAL', 'Глобальный (Онлайн)')">
+        <div><b>🌍 Общий чат</b><br><small style="color:#aaa;">С теми, кто сейчас в сети</small></div>
+    </div>
+    <h4 style="margin: 15px 0 10px; color:#777; font-size:12px; text-transform:uppercase;">Мои контакты</h4>
+    <div id="rooms-list"></div>
+</div>
+
+<div id="side">
+    <div style="padding:30px 20px; text-align:center; border-bottom:1px solid #333;">
+        <img id="my-ava" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" style="width:70px; height:70px; border-radius:50%; border:2px solid var(--gold); object-fit:cover;">
+        <h3 id="my-name" style="margin-top:10px;">Юзер</h3>
+        <small id="my-id" style="color:var(--acc); user-select:all;"></small>
+    </div>
+    <div class="opt" onclick="mod('m-add',1)">➕ Добавить друга по ID</div>
+    <div class="opt" onclick="mod('m-grp',1)">👥 Создать группу</div>
+    <div class="opt" onclick="mod('m-shop',1)">🛒 Магазин Ролей</div>
+    <div class="opt" onclick="mod('m-prof',1)">⚙️ Профиль и Настройки</div>
+    <div class="opt" onclick="mod('m-search',1)">📡 Поиск онлайна</div>
+    <div id="adm-btn" class="opt" style="display:none; color:red;" onclick="mod('m-con',1)">⚡ ТЕРМИНАЛ</div>
+    <div class="opt" onclick="clearData()" style="color:#ff5252; margin-top:20px;">🧹 Полный сброс</div>
+    <div class="opt" onclick="side(0)" style="color:#777;">Закрыть меню</div>
+</div>
+
+<div id="chat-view">
+    <header style="background: rgba(15,15,19,0.9); backdrop-filter: blur(10px);">
+        <div onclick="closeChat()" style="font-size:24px; padding-right:15px;">←</div>
+        <b id="c-name" style="flex:1;">Чат</b>
+        <button id="btn-inv" style="display:none; width:auto; padding:6px 12px; margin:0; background:#333;" onclick="inviteToGroup()">➕ Позвать</button>
+    </header>
+    <div id="msg-box"></div>
+    <div id="stk-panel">
+        <button onclick="document.getElementById('f-stk').click()">+ Сделать стикер из фото</button>
+        <div id="stk-list" class="stk-grid"></div>
+    </div>
+    <div style="padding:10px; background:var(--main); display:flex; gap:8px; border-top:1px solid #333;">
+        <button onclick="toggleStk()" style="width:45px; background:#222;">😊</button>
+        <input type="text" id="m-in" placeholder="Сообщение..." style="margin:0;">
+        <button onclick="sendMsg()" class="primary" style="width:45px; border-radius:50%;">➤</button>
+    </div>
+</div>
+
+<div id="m-add" class="mod"><div class="mod-in">
+    <h3>Добавить друга</h3><br>
+    <p style="font-size:12px; color:#aaa;">Внимание: Друг должен держать приложение открытым прямо сейчас!</p>
+    <input type="text" id="f-id" placeholder="ID друга (например: 12345)">
+    <button class="primary" onclick="addFriend()">Синхронизировать</button>
+    <button onclick="mod('m-add',0)">Отмена</button>
+</div></div>
+
+<div id="m-grp" class="mod"><div class="mod-in">
+    <h3>Новая группа</h3>
+    <input type="text" id="g-name" placeholder="Название группы">
+    <button class="primary" onclick="createGroup()">Создать</button>
+    <button onclick="mod('m-grp',0)">Отмена</button>
+</div></div>
+
+<div id="m-shop" class="mod"><div class="mod-in">
+    <h3>Магазин</h3><br>
+    <button class="primary" onclick="buy('VIP', 500)">VIP (500⭐)</button>
+    <button style="background:gold; color:black;" onclick="buy('GOD', 100000)">GOD (100k⭐)</button>
+    <button onclick="mod('m-shop',0)">Закрыть</button>
+</div></div>
+
+<div id="m-prof" class="mod"><div class="mod-in">
+    <h3>Профиль</h3>
+    <input type="text" id="p-nick" placeholder="Новый ник">
+    <button onclick="document.getElementById('f-ava').click()">📸 Сменить Аватар</button>
+    <button onclick="document.getElementById('f-bg').click()">🖼 Сменить Обои чата</button>
+    <button onclick="recVoice()" style="background:#ff4757;">🎤 Записать Голос (5 сек)</button>
+    <button class="primary" onclick="saveProf()">Сохранить</button>
+</div></div>
+
+<div id="m-search" class="mod"><div class="mod-in">
+    <h3>Кто в сети (Пинг)</h3>
+    <div id="online-list" style="margin-top:10px; max-height:200px; overflow-y:auto; font-size:14px;">Идет поиск...</div>
+    <button onclick="mod('m-search',0)">Закрыть</button>
+</div></div>
+
+<div id="m-con" class="mod"><div class="mod-in" style="border:1px solid #0f0;">
+    <h3 style="color:#0f0;">КОНСОЛЬ</h3>
+    <input type="text" id="cmd-in" style="color:#0f0; border:1px solid #0f0;">
+    <button onclick="runCmd()" style="background:#0f0; color:#000;">ВЫПОЛНИТЬ</button>
+    <button onclick="mod('m-con',0)">Закрыть</button>
+</div></div>
+
+<input type="file" id="f-ava" hidden onchange="handleMed(this,'ava')">
+<input type="file" id="f-bg" hidden onchange="handleMed(this,'bg')">
+<input type="file" id="f-stk" hidden onchange="handleStk(this)">
+
+<script>
+const DB = "W74";
+let user = JSON.parse(localStorage.getItem(DB+'_U') || `{"n":"Юзер","id":"${Math.floor(10000+Math.random()*89999)}","s":100,"a":"","bg":"","v":"","stk":[]}`);
+let rooms = JSON.parse(localStorage.getItem(DB+'_R') || '[]');
+let hist = JSON.parse(localStorage.getItem(DB+'_H') || '{}');
+let curChat = null;
+let activePeers = {}; 
+
+const peer = new Peer(user.id);
+let conns = {};
+
+peer.on('open', (id) => {
+    document.getElementById('net-stat').style.background = '#00e676';
+    document.getElementById('net-stat').style.boxShadow = '0 0 10px #00e676';
+    upUI(); renderR();
+    
+    setInterval(() => {
+        let olHtml = '';
+        rooms.filter(r=>!r.isG).forEach(r => {
+            let c = peer.connect(r.id);
+            c.on('open', () => { c.send({t:'ping', id:user.id, n:user.n}); activePeers[r.id] = Date.now(); });
+            if(activePeers[r.id] && Date.now() - activePeers[r.id] < 15000) olHtml += `<div style="color:#00e676; margin:5px 0;">🟢 ${r.n} (ID: ${r.id})</div>`;
+        });
+        document.getElementById('online-list').innerHTML = olHtml || 'Никого нет в сети...';
+        renderR();
+    }, 5000);
+});
+
+peer.on('connection', c => {
+    conns[c.peer] = c;
+    c.on('data', d => {
+        if(d.t==='ping') { activePeers[d.id] = Date.now(); }
+        if(d.t==='sync_f') {
+            if(!rooms.find(r=>r.id===d.id)) {
+                rooms.push({id:d.id, n:d.n, isG:false}); save(); renderR();
+                alert(`🔔 ${d.n} добавил вас в контакты!`);
+            }
+        }
+        if(d.t==='inv_g') {
+            if(!rooms.find(r=>r.id===d.gid)) {
+                rooms.push({id:d.gid, n:d.gn, isG:true}); save(); renderR();
+                alert(`👥 Вас добавили в группу: ${d.gn}`);
+            }
+        }
+        if(d.t==='msg') {
+            let rid = d.gid || (d.m==='g'?'GLOBAL':c.peer);
+            if(!hist[rid]) hist[rid]=[]; 
+            hist[rid].push({n:d.n, c:d.c, time:d.time, type:d.type, side:'in'});
+            save(); if(curChat === rid) renderC();
+        }
+    });
+});
+
+function save() {
+    localStorage.setItem(DB+'_U', JSON.stringify(user));
+    localStorage.setItem(DB+'_R', JSON.stringify(rooms));
+    localStorage.setItem(DB+'_H', JSON.stringify(hist));
+}
+
+function upUI() {
+    document.getElementById('s-val').innerText = user.s;
+    document.getElementById('my-name').innerText = user.n + (user.r ? ` [${user.r}]` : '');
+    document.getElementById('my-id').innerText = "Твой ID: " + user.id;
+    if(user.a) document.getElementById('my-ava').src = user.a;
+    if(user.bg) document.getElementById('chat-view').style.backgroundImage = `url(${user.bg})`;
+    renderStk();
+}
+
+function sendMsg() {
+    let i = document.getElementById('m-in'); let txt = i.value.trim(); if(!txt) return;
+    if(txt==='/6767') { document.getElementById('adm-btn').style.display='block'; i.value=''; return; }
+    if(txt.startsWith('/dice')) {
+        let bet = parseInt(txt.split(' ')[1])||10;
+        if(user.s < bet) return alert("Мало звезд!");
+        let r = Math.floor(Math.random()*6)+1;
+        if(r>=4) { user.s+=bet; txt=`🎲 Бросил кости: ${r}. Выиграл +${bet}⭐!`; } 
+        else { user.s-=bet; txt=`🎲 Бросил кости: ${r}. Проиграл -${bet}⭐...`; }
+    }
+    let time = new Date().toLocaleTimeString().slice(0,5);
+    _tx({n:user.n, c:txt, id:user.id, time:time, t:'msg', type:'txt'});
+    i.value = '';
+}
+
+function _tx(d) {
+    if(curChat==='GLOBAL') {
+        rooms.filter(r=>!r.isG).forEach(r=>{ let c=peer.connect(r.id); c.on('open',()=>c.send({...d, m:'g'})); });
+    } else {
+        let room = rooms.find(x=>x.id===curChat);
+        if(room && room.isG) {
+            d.gid = curChat;
+            rooms.filter(r=>!r.isG).forEach(r=>{ let c=peer.connect(r.id); c.on('open',()=>c.send(d)); });
+        } else {
+            let c=peer.connect(curChat); c.on('open',()=>c.send(d));
+        }
+    }
+    if(!hist[curChat]) hist[curChat]=[]; hist[curChat].push({...d, side:'out'});
+    user.s += 5; upUI(); renderC(); save();
+}
+
+function renderC() {
+    let b = document.getElementById('msg-box');
+    b.innerHTML = (hist[curChat]||[]).map(m=>`
+        <div class="msg ${m.side}">
+            <div class="msg-info"><span>${m.n}</span> <span>${m.time}</span></div>
+            ${m.type==='stk' ? `<img src="${m.c}" class="stk-img">` : m.c}
+        </div>
+    `).join('');
+    b.scrollTop = b.scrollHeight;
+}
+
+function addFriend() {
+    let id = document.getElementById('f-id').value.trim();
+    if(!id || id===user.id) return alert("Некорректный ID!");
+    let c = peer.connect(id);
+    c.on('open', () => {
+        if(!rooms.find(r=>r.id===id)) { rooms.push({id:id, n:"Контакт "+id, isG:false}); save(); renderR(); }
+        c.send({t:'sync_f', id:user.id, n:user.n});
+        alert("✅ Контакт добавлен!");
+        mod('m-add',0);
+    });
+}
+
+function createGroup() {
+    let n = document.getElementById('g-name').value.trim();
+    if(n) { rooms.push({id:'G'+Date.now(), n:n, isG:true}); save(); renderR(); mod('m-grp',0); }
+}
+
+function renderR() {
+    let now = Date.now();
+    document.getElementById('rooms-list').innerHTML = rooms.map(r=>{
+        let isOn = (activePeers[r.id] && now-activePeers[r.id]<15000);
+        return `<div class="card ${isOn&&!r.isG?'online':''}" onclick="openChat('${r.id}','${r.n}')">
+            <div><b>${r.isG?'👥':'👤'} ${r.n}</b></div>
+        </div>`;
+    }).join('');
+}
+
+function openChat(id, n) {
+    curChat = id; document.getElementById('c-name').innerText = n;
+    document.getElementById('btn-inv').style.display = rooms.find(r=>r.id===id)?.isG?'block':'none';
+    document.getElementById('chat-view').style.display='flex'; renderC();
+}
+
+function handleMed(inp, t) {
+    let r=new FileReader(); r.onload=e=>{ let i=new Image(); i.onload=()=>{
+        let c=document.createElement('canvas'); c.width=150; c.height=150; c.getContext('2d').drawImage(i,0,0,150,150);
+        let b64=c.toDataURL('image/jpeg',0.5); if(t==='ava') user.a=b64; else user.bg=b64; upUI(); save();
+    }; i.src=e.target.result; }; r.readAsDataURL(inp.files[0]);
+}
+
+function handleStk(inp) {
+    let r=new FileReader(); r.onload=e=>{ let i=new Image(); i.onload=()=>{
+        let c=document.createElement('canvas'); c.width=180; c.height=180; c.getContext('2d').drawImage(i,0,0,180,180);
+        user.stk.push(c.toDataURL('image/png',0.6)); renderStk(); save();
+    }; i.src=e.target.result; }; r.readAsDataURL(inp.files[0]);
+}
+
+function renderStk() { document.getElementById('stk-list').innerHTML=(user.stk||[]).map(s=>`<img src="${s}" style="width:100%; border-radius:10px;" onclick="sendStk('${s}')">`).join(''); }
+function sendStk(s) { let t=new Date().toLocaleTimeString().slice(0,5); _tx({n:user.n, c:s, id:user.id, time:t, t:'msg', type:'stk'}); toggleStk(); }
+function buy(r,p) { if(user.s>=p) { user.s-=p; user.r=r; upUI(); save(); alert("Куплено!"); } else alert("Мало звезд!"); }
+function runCmd() { let p=document.getElementById('cmd-in').value.split(' '); if(p[0]==='give') user.s+=parseInt(p[1]); upUI(); save(); }
+function saveProf() { let n=document.getElementById('p-nick').value; if(n) user.n=n; upUI(); save(); mod('m-prof',0); }
+function clearData() { if(confirm("Удалить всё?")) { localStorage.clear(); location.reload(); } }
+function side(s) { document.getElementById('side').classList.toggle('side-in',s); }
+function mod(id,s) { document.getElementById(id).style.display=s?'flex':'none'; }
+function closeChat() { document.getElementById('chat-view').style.display='none'; curChat=null; }
+function toggleStk() { let p=document.getElementById('stk-panel'); p.style.display=(p.style.display==='none'?'block':'none'); }
+</script>
+</body>
+                                                                                             </html>
+                                                                                             
